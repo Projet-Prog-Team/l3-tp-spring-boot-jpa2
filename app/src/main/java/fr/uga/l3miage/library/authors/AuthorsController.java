@@ -1,17 +1,21 @@
 package fr.uga.l3miage.library.authors;
 
 import fr.uga.l3miage.data.domain.Author;
+import fr.uga.l3miage.data.domain.Book;
 import fr.uga.l3miage.library.books.BookDTO;
 import fr.uga.l3miage.library.books.BooksMapper;
 import fr.uga.l3miage.library.service.AuthorService;
+import fr.uga.l3miage.library.service.DeleteAuthorException;
+import fr.uga.l3miage.library.service.EntityNotFoundException;
+
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Set;
 
 @RestController
 @RequestMapping(value = "/api/v1", produces = "application/json")
@@ -41,25 +45,95 @@ public class AuthorsController {
                 .toList();
     }
 
-    public AuthorDTO author(Long id) {
-        return null;
+    @GetMapping("/authors/{id}")
+    public AuthorDTO author(@PathVariable("id") Long id) throws EntityNotFoundException {
+        try{
+            Author auteur = authorService.get(id);
+            return authorMapper.entityToDTO(auteur);
+        }
+        catch(EntityNotFoundException e){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Auteur non trouvé.", e);
+        }
     }
 
-    public AuthorDTO newAuthor(AuthorDTO author) {
-        return null;
+    @PostMapping("/authors")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AuthorDTO newAuthor(@RequestBody AuthorDTO authorDTO) throws EntityNotFoundException {
+        Author author = authorMapper.dtoToEntity(authorDTO);
+        try{
+            Author AuthorDoublon = authorService.get(author.getId());
+        } //si on arrive dans le catch, c'est que l'auteur n'existe pas encore, alors on peut l'insérer.
+        catch(EntityNotFoundException e){
+            if (author.getFullName().trim() == "" || author.getFullName() == null){
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le nom de l'auteur ne peut pas être vide.");
+            }
+            authorService.save(author);
+            return authorDTO;
+        } //sinon, on renvoie une exception
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Un auteur avec cet id existe déjà.");
     }
 
-    public AuthorDTO updateAuthor(AuthorDTO author, Long id) {
+    @PutMapping("/authors/{authorId}")
+    public AuthorDTO updateAuthor(@RequestBody AuthorDTO authorDTO, @PathVariable("authorId") Long id) throws EntityNotFoundException {
+        Author author = authorMapper.dtoToEntity(authorDTO);
+        try{
+            Author auteur = authorService.get(id);
+        } 
+        catch(EntityNotFoundException e){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "L'auteur à remplacer n'existe pas.");
+        }
         // attention AuthorDTO.id() doit être égale à id, sinon la requête utilisateur est mauvaise
-        return null;
+        if (id == authorDTO.id()){
+            authorService.update(author);
+        }
+        else{
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L'ancien et le nouvel auteur n'ont pas le même id.");
+        }
+        return authorDTO;
+        
     }
 
-    public void deleteAuthor(Long id) {
-        // unimplemented... yet!
-    }
+    @DeleteMapping("/authors/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAuthor(@PathVariable("id") Long id) throws EntityNotFoundException, DeleteAuthorException{
+        try{
+            Author auteur = authorService.get(id);
+        } 
+        catch(EntityNotFoundException e){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "L'auteur à remplacer n'existe pas.");
+        }
+        Author auteur = authorService.get(id);
+        Set<Book> books = auteur.getBooks();
+        Collection<BookDTO> booksDTO = booksMapper.entityToDTO(books);
+        boolean canBeDeleted = true;
+        if (booksDTO != null){
+            for (BookDTO bookDTO : booksDTO) {
+                Collection<AuthorDTO> auteurs = bookDTO.authors();
+                if(auteurs.size()>1){
+                    canBeDeleted = false; //ne peut pas être effacé si co-auteur
+                }
+            }
+        }   
+        if(canBeDeleted){
+            authorService.delete(id);
+        }
+        else{
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L'auteur ne peut pas être effacé car il est co-auteur d'au moins un livre.");
+        }
 
-    public Collection<BookDTO> books(Long authorId) {
-        return Collections.emptyList();
+    }
+    @GetMapping("/authors/{authorId}/books")
+    public Collection<BookDTO> books(@PathVariable("authorId") Long authorId) throws EntityNotFoundException {
+        try{
+            Author auteur = authorService.get(authorId);
+        } 
+        catch(EntityNotFoundException e){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "L'auteur n'existe pas.");
+        }
+        Author auteur = authorService.get(authorId);
+        Set<Book> books = auteur.getBooks();
+        Collection<BookDTO> booksDTO = booksMapper.entityToDTO(books);
+        return booksDTO; //exception si null ?
     }
 
 }
