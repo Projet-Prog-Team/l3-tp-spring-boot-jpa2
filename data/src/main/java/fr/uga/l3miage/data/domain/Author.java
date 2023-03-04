@@ -3,7 +3,11 @@ package fr.uga.l3miage.data.domain;
 import java.util.HashSet;
 import java.util.Set;
 
+import jakarta.persistence.*;
+
 public class Author {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String fullName;
     private Set<Book> books;

@@ -61,14 +61,15 @@ public class AuthorsController {
     public AuthorDTO newAuthor(@RequestBody AuthorDTO authorDTO) throws EntityNotFoundException {
         Author author = authorMapper.dtoToEntity(authorDTO);
         try{
-            Author AuthorDoublon = authorService.get(author.getId());
+            Author authorDoublon = authorService.get(author.getId());
         } //si on arrive dans le catch, c'est que l'auteur n'existe pas encore, alors on peut l'insérer.
         catch(EntityNotFoundException e){
-            if (author.getFullName().trim() == "" || author.getFullName() == null){
+            if (author.getFullName() == null || author.getFullName().trim() == ""){
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le nom de l'auteur ne peut pas être vide.");
             }
+            author.setId(authorDTO.id());
             authorService.save(author);
-            return authorDTO;
+            return authorMapper.entityToDTO(author);
         } //sinon, on renvoie une exception
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Un auteur avec cet id existe déjà.");
     }
