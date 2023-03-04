@@ -85,12 +85,12 @@ public class AuthorsController {
         }
         // attention AuthorDTO.id() doit être égale à id, sinon la requête utilisateur est mauvaise
         if (id == authorDTO.id()){
-            authorService.update(author);
+            Author authorUpdated = authorService.update(author);
+            return authorMapper.entityToDTO(authorUpdated);
         }
         else{
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L'ancien et le nouvel auteur n'ont pas le même id.");
         }
-        return authorDTO;
         
     }
 

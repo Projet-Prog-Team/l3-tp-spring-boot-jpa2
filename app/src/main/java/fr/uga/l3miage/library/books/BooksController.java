@@ -24,6 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 @RestController
 @RequestMapping(value = "/api/v1", produces = "application/json")
@@ -41,7 +43,7 @@ public class BooksController {
     }
 
     @GetMapping("/books")
-    public Collection<BookDTO> books(@RequestParam("q") String query) {
+    public Collection<BookDTO> books(@RequestParam(value = "q", required = false) String query) {
         Collection<Book> books;
         if (query == null) {
             books = bookService.list();
@@ -66,7 +68,7 @@ public class BooksController {
    
     @PostMapping("/authors/{authorId}/books")
     @ResponseStatus(HttpStatus.CREATED)
-    public BookDTO newBook(@PathVariable("authorId") Long authorId, @RequestBody BookDTO book) throws EntityNotFoundException {
+    public BookDTO newBook(@PathVariable("authorId") Long authorId, @RequestBody BookDTO bookDto) throws EntityNotFoundException {
         //Book bookEntity = booksMapper.dtoToEntity(book);
         try{
             Author auteur = authorService.get(authorId);
@@ -74,33 +76,43 @@ public class BooksController {
         catch(EntityNotFoundException e){
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "L'auteur n'existe pas.", e);
         }
-        if (book.title() == null || book.title().trim() == "" ){
+        if (bookDto.title() == null || bookDto.title().trim() == "" ){
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le titre du livre ne peut pas être vide.");
         }
 
         //vérifier le isbn
-        if (book.isbn() < 100000000){
+        if (bookDto.isbn() < 100000000){
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le code isbn du livre n'est pas correct.");
         }
 
         //vérifier la langue
-        boolean correctLanguage = false;
-        for (Language language : Language.values()) {
-            if (language.name().equalsIgnoreCase(book.language())) {
-                correctLanguage = true;
-                break;
+        if (bookDto.language() != null){
+            boolean correctLanguage = false;
+            for (Language language : Language.values()) {
+                if (language.name().equalsIgnoreCase(bookDto.language())) {
+                    correctLanguage = true;
+                    break;
+                }
             }
-        }
-        if (!correctLanguage){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La langue du livre est mauvaise.");
+            if (!correctLanguage){
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La langue du livre est mauvaise.");
+            }
         }
 
         //vérifier l'année. On considère qu'on peut avoir des dates négatives pour les -JC
-        if ( book.year() > Calendar.getInstance().get(Calendar.YEAR)){
+        if ( bookDto.year() > Calendar.getInstance().get(Calendar.YEAR)){
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L'année de sortie du livre n'est pas correcte");
         }
-        bookService.save(authorId, booksMapper.dtoToEntity(book));
-        return book;
+        Author auteur = authorService.get(authorId);
+        Set<Author> authorSet = new HashSet<>();
+        authorSet.add(auteur);
+        Book book = booksMapper.dtoToEntity(bookDto);
+
+        book.setId(bookDto.id());
+        book.setAuthors(authorSet);
+
+        bookService.save(authorId, book);
+        return booksMapper.entityToDTO(book);
     }
     
     @PutMapping("/books/{bookId}")
@@ -111,13 +123,15 @@ public class BooksController {
         catch(EntityNotFoundException e){
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Le livre n'existe pas.", e);
         }
+        
         if (bookId == book.id()){
-            bookService.update(booksMapper.dtoToEntity(book));
+            //booksMapper.dtoToEntity(book).getAuthors();
+            Book updatedBook = bookService.update(booksMapper.dtoToEntity(book));
+            return booksMapper.entityToDTO(updatedBook);
         }
         else{
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L'ancien et le nouvel auteur n'ont pas le même id.");
         }
-        return book;
     }
 
     @DeleteMapping("/books/{id}")
@@ -141,5 +155,7 @@ public class BooksController {
         }
         Book book = bookService.get(bookId);
         booksMapper.entityToDTO(book).authors().add(author);
+        bookService.update(bookService.get(bookId));
+
     }
 }

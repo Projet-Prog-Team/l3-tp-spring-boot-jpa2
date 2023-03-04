@@ -3,8 +3,11 @@ package fr.uga.l3miage.data.domain;
 import java.util.HashSet;
 import java.util.Set;
 
-public class Book {
+import jakarta.persistence.*;
 
+public class Book {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String title;
     private long isbn;
