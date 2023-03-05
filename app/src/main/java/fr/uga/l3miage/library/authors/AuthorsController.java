@@ -117,6 +117,7 @@ public class AuthorsController {
         }   
         if(canBeDeleted){
             authorService.delete(id);
+            //il faudrait supprimer ses livres
         }
         else{
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L'auteur ne peut pas être effacé car il est co-auteur d'au moins un livre.");

@@ -118,15 +118,20 @@ public class BooksController {
     @PutMapping("/books/{bookId}")
     public BookDTO updateBook(@PathVariable Long bookId, @RequestBody BookDTO book) throws EntityNotFoundException {
         try{ //vérification de l'existence du livre à modifier
-            Book bookTest = bookService.get(bookId);
+            Book bookOrigine = bookService.get(bookId);
         }
         catch(EntityNotFoundException e){
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Le livre n'existe pas.", e);
         }
         
         if (bookId == book.id()){
-            //booksMapper.dtoToEntity(book).getAuthors();
-            Book updatedBook = bookService.update(booksMapper.dtoToEntity(book));
+            Book bookOrigine = bookService.get(bookId);
+            Set<Author> auteursLivreOrigine = bookOrigine.getAuthors();
+
+            Book modifiedMook = booksMapper.dtoToEntity(book);
+            modifiedMook.setAuthors(auteursLivreOrigine);
+
+            Book updatedBook = bookService.update(modifiedMook);
             return booksMapper.entityToDTO(updatedBook);
         }
         else{
@@ -155,7 +160,7 @@ public class BooksController {
         }
         Book book = bookService.get(bookId);
         booksMapper.entityToDTO(book).authors().add(author);
-        bookService.update(bookService.get(bookId));
+        bookService.update(book);
 
     }
 }
