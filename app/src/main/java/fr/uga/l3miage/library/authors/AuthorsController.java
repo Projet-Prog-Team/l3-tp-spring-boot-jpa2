@@ -5,6 +5,7 @@ import fr.uga.l3miage.data.domain.Book;
 import fr.uga.l3miage.library.books.BookDTO;
 import fr.uga.l3miage.library.books.BooksMapper;
 import fr.uga.l3miage.library.service.AuthorService;
+import fr.uga.l3miage.library.service.BookService;
 import fr.uga.l3miage.library.service.DeleteAuthorException;
 import fr.uga.l3miage.library.service.EntityNotFoundException;
 
@@ -24,14 +25,17 @@ public class AuthorsController {
     private final AuthorService authorService;
     private final AuthorMapper authorMapper;
     private final BooksMapper booksMapper;
+    private final BookService booksService;
 
     @Autowired
-    public AuthorsController(AuthorService authorService, AuthorMapper authorMapper, BooksMapper booksMapper) {
+    public AuthorsController(AuthorService authorService, AuthorMapper authorMapper, BooksMapper booksMapper, BookService booksService) {
         this.authorService = authorService;
         this.authorMapper = authorMapper;
         this.booksMapper = booksMapper;
+        this.booksService = booksService;
     }
 
+    //retourner tous les auteurs
     @GetMapping("/authors")
     public Collection<AuthorDTO> authors(@RequestParam(value = "q", required = false) String query) {
         Collection<Author> authors;
@@ -45,6 +49,7 @@ public class AuthorsController {
                 .toList();
     }
 
+    //retourner un auteur
     @GetMapping("/authors/{id}")
     public AuthorDTO author(@PathVariable("id") Long id) throws EntityNotFoundException {
         try{
@@ -56,6 +61,7 @@ public class AuthorsController {
         }
     }
 
+    //créer un auteur
     @PostMapping("/authors")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthorDTO newAuthor(@RequestBody AuthorDTO authorDTO) throws EntityNotFoundException {
@@ -74,6 +80,7 @@ public class AuthorsController {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Un auteur avec cet id existe déjà.");
     }
 
+    //mettre à jour un auteur
     @PutMapping("/authors/{authorId}")
     public AuthorDTO updateAuthor(@RequestBody AuthorDTO authorDTO, @PathVariable("authorId") Long id) throws EntityNotFoundException {
         Author author = authorMapper.dtoToEntity(authorDTO);
@@ -94,6 +101,7 @@ public class AuthorsController {
         
     }
 
+    //effacer un auteur
     @DeleteMapping("/authors/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAuthor(@PathVariable("id") Long id) throws EntityNotFoundException, DeleteAuthorException{
@@ -105,25 +113,32 @@ public class AuthorsController {
         }
         Author auteur = authorService.get(id);
         Set<Book> books = auteur.getBooks();
-        Collection<BookDTO> booksDTO = booksMapper.entityToDTO(books);
         boolean canBeDeleted = true;
-        if (booksDTO != null){
-            for (BookDTO bookDTO : booksDTO) {
-                Collection<AuthorDTO> auteurs = bookDTO.authors();
-                if(auteurs.size()>1){
+        if (books != null){ 
+            for (Book book : books){
+                Set<Author> authorsForEachBook = book.getAuthors();
+                if (authorsForEachBook.size() > 1){
                     canBeDeleted = false; //ne peut pas être effacé si co-auteur
                 }
             }
-        }   
+        }
+
         if(canBeDeleted){
             authorService.delete(id);
-            //il faudrait supprimer ses livres
+            if (books != null){
+                for (Book book : books){
+                    if (book.getId() > 0){
+                        booksService.delete(book.getId()); //suppression des livres de l'auteur
+                    } 
+                }
+            }
         }
         else{
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L'auteur ne peut pas être effacé car il est co-auteur d'au moins un livre.");
         }
 
     }
+    //retourner tous les livres d'un auteur
     @GetMapping("/authors/{authorId}/books")
     public Collection<BookDTO> books(@PathVariable("authorId") Long authorId) throws EntityNotFoundException {
         try{
@@ -135,7 +150,7 @@ public class AuthorsController {
         Author auteur = authorService.get(authorId);
         Set<Book> books = auteur.getBooks();
         Collection<BookDTO> booksDTO = booksMapper.entityToDTO(books);
-        return booksDTO; //exception si null ?
+        return booksDTO; 
     }
 
 }
